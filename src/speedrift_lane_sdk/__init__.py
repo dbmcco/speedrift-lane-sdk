@@ -3,7 +3,7 @@
 
 from speedrift_lane_sdk.constants import ExitCode
 from speedrift_lane_sdk.lane_contract import LaneFinding, LaneResult, validate_lane_output
-from speedrift_lane_sdk.workgraph import Workgraph, find_workgraph_dir, load_workgraph
+from speedrift_lane_sdk.workgraph import Workgraph, find_workgraph_dir, load_tasks, load_workgraph
 
 __all__ = [
     "ExitCode",
@@ -12,5 +12,6 @@ __all__ = [
     "validate_lane_output",
     "Workgraph",
     "find_workgraph_dir",
+    "load_tasks",
     "load_workgraph",
 ]

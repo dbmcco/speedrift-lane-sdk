@@ -102,6 +102,21 @@ def find_workgraph_dir(explicit: Path | None = None) -> Path:
     raise FileNotFoundError("Could not find .workgraph/graph.jsonl; pass --dir.")
 
 
+def load_tasks(wg_dir: Path) -> dict[str, dict[str, Any]]:
+    """Read graph.jsonl and return a dict of task-id -> task-object."""
+    tasks: dict[str, dict[str, Any]] = {}
+    for line in (wg_dir / "graph.jsonl").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        obj = json.loads(line)
+        if obj.get("kind") != "task":
+            continue
+        tid = str(obj.get("id"))
+        tasks[tid] = obj
+    return tasks
+
+
 def load_workgraph(wg_dir: Path) -> Workgraph:
     """Read graph.jsonl and return an eager Workgraph with populated tasks dict."""
     graph_path = wg_dir / "graph.jsonl"
