@@ -42,10 +42,18 @@ class Workgraph:
         description: str = "",
         blocked_by: list[str] | None = None,
         tags: list[str] | None = None,
+        verify: str | None = None,
+        exec_mode: str | None = None,
+        skill: list[str] | None = None,
     ) -> bool:
         """Idempotent task creation. Returns True if created, False if existed.
 
         Eager mode checks ``self.tasks`` dict; lazy mode calls ``show_task()``.
+
+        Args:
+            verify: Shell command wg runs to validate task completion (``--verify``).
+            exec_mode: Agent execution weight: full (default), light, bare, shell.
+            skill: Routing hints passed to agency for agent selection (``--skill``).
         """
         # --- idempotency check ---
         if self.tasks is not None:
@@ -56,7 +64,8 @@ class Workgraph:
                 return False
 
         # --- create via wg add ---
-        cmd = ["wg", "--dir", str(self.wg_dir), "add", title, "--id", task_id]
+        # --no-place bypasses draft mode so follow-up tasks are immediately active.
+        cmd = ["wg", "--dir", str(self.wg_dir), "add", title, "--id", task_id, "--no-place"]
         if description:
             cmd += ["-d", description]
         if blocked_by:
@@ -64,6 +73,13 @@ class Workgraph:
         if tags:
             for t in tags:
                 cmd += ["-t", t]
+        if verify:
+            cmd += ["--verify", verify]
+        if exec_mode:
+            cmd += ["--exec-mode", exec_mode]
+        if skill:
+            for s in skill:
+                cmd += ["--skill", s]
         subprocess.check_call(cmd, stdout=subprocess.DEVNULL)
 
         # --- keep eager dict in sync ---
