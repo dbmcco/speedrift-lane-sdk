@@ -42,6 +42,66 @@ class TestFindWorkgraphDir:
             find_workgraph_dir(tmp_path / "nope")
 
 
+class TestFindWorkgraphDirGraphDirNames:
+    """Tests for .wg-aware resolution (hybrid and current-graph layouts)."""
+
+    def test_explicit_wg_path(self, tmp_path: Path):
+        """Passing a .wg directory itself should return it directly."""
+        wg = tmp_path / ".wg"
+        wg.mkdir()
+        (wg / "graph.jsonl").write_text("")
+        assert find_workgraph_dir(wg) == wg
+
+    def test_resolves_wg_when_no_workgraph(self, tmp_path: Path):
+        """A repo with only .wg/graph.jsonl should resolve .wg."""
+        wg = tmp_path / ".wg"
+        wg.mkdir()
+        (wg / "graph.jsonl").write_text("")
+        assert find_workgraph_dir(tmp_path) == wg
+
+    def test_hybrid_prefers_initialized_wg_over_legacy_residue(self, tmp_path: Path):
+        """Legacy .workgraph residue without graph.jsonl must not shadow active .wg."""
+        legacy = tmp_path / ".workgraph"
+        legacy.mkdir()
+        (legacy / "config.toml").write_text("")
+        current = tmp_path / ".wg"
+        current.mkdir()
+        (current / "graph.jsonl").write_text("")
+        assert find_workgraph_dir(tmp_path) == current
+
+    def test_hybrid_walk_up_prefers_initialized_wg(self, tmp_path: Path, monkeypatch):
+        """Walking up from a subdir must land on the initialized .wg, not residue."""
+        legacy = tmp_path / ".workgraph"
+        legacy.mkdir()
+        (legacy / "archive.jsonl").write_text("")
+        current = tmp_path / ".wg"
+        current.mkdir()
+        (current / "graph.jsonl").write_text("")
+        subdir = tmp_path / "src" / "pkg"
+        subdir.mkdir(parents=True)
+        monkeypatch.chdir(subdir)
+        assert find_workgraph_dir() == current
+
+    def test_two_initialized_graphs_raises_conflict(self, tmp_path: Path):
+        """Two initialized graphs must fail loudly instead of guessing."""
+        for name in (".workgraph", ".wg"):
+            graph = tmp_path / name
+            graph.mkdir()
+            (graph / "graph.jsonl").write_text("")
+        with pytest.raises(Exception, match=r"Two initialized Workgraph"):
+            find_workgraph_dir(tmp_path)
+
+    def test_walk_up_finds_wg(self, tmp_path: Path, monkeypatch):
+        """Walking up from a nested cwd should find .wg/graph.jsonl."""
+        wg = tmp_path / ".wg"
+        wg.mkdir()
+        (wg / "graph.jsonl").write_text("")
+        subdir = tmp_path / "src"
+        subdir.mkdir()
+        monkeypatch.chdir(subdir)
+        assert find_workgraph_dir() == wg
+
+
 # ---------------------------------------------------------------------------
 # load_workgraph
 # ---------------------------------------------------------------------------

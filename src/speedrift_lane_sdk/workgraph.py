@@ -9,6 +9,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+GRAPH_DIR_NAMES = (".workgraph", ".wg")
+
+
+class WorkgraphDirectoryConflictError(RuntimeError):
+    """Raised when a repository has two initialized Workgraph directories."""
+
+
+def _is_initialized_graph(path: Path) -> bool:
+    return (path / "graph.jsonl").is_file()
+
 
 @dataclass
 class Workgraph:
@@ -97,24 +107,47 @@ class Workgraph:
 
 
 def find_workgraph_dir(explicit: Path | None = None) -> Path:
-    """Locate the .workgraph directory.
+    """Locate the active Workgraph directory (``.wg`` or legacy ``.workgraph``).
 
-    ``explicit`` may be either a project root or the .workgraph directory itself.
-    When None, walks up from cwd looking for .workgraph/graph.jsonl.
+    ``explicit`` may be either a project root or a graph directory itself
+    (named ``.workgraph`` or ``.wg``). When None, walks up from cwd looking
+    for an initialized graph. In a hybrid repository — legacy ``.workgraph/``
+    residue next to the active ``.wg/`` — only an initialized directory
+    (one containing ``graph.jsonl``) resolves; two initialized directories
+    raise :class:`WorkgraphDirectoryConflictError`.
     """
     if explicit:
         p = explicit
-        if p.name != ".workgraph":
-            p = p / ".workgraph"
-        if not (p / "graph.jsonl").exists():
+        if p.name not in GRAPH_DIR_NAMES:
+            legacy = p / ".workgraph"
+            current = p / ".wg"
+            if _is_initialized_graph(current) and _is_initialized_graph(legacy):
+                raise WorkgraphDirectoryConflictError(
+                    "Two initialized Workgraph directories found: "
+                    f"{legacy} and {current}. Choose one graph before continuing."
+                )
+            if _is_initialized_graph(current):
+                return current
+            p = legacy
+        if not _is_initialized_graph(p):
             raise FileNotFoundError(f"Workgraph not found at: {p}")
         return p
 
     cur = Path.cwd()
-    for p in [cur, *cur.parents]:
-        candidate = p / ".workgraph" / "graph.jsonl"
-        if candidate.exists():
-            return candidate.parent
+    for base in [cur, *cur.parents]:
+        current = base / ".wg"
+        legacy = base / ".workgraph"
+        current_init = _is_initialized_graph(current)
+        legacy_init = _is_initialized_graph(legacy)
+        if current_init and legacy_init:
+            raise WorkgraphDirectoryConflictError(
+                "Two initialized Workgraph directories found: "
+                f"{legacy} and {current}. Choose one graph before continuing."
+            )
+        if current_init:
+            return current
+        if legacy_init:
+            return legacy
     raise FileNotFoundError("Could not find .workgraph/graph.jsonl; pass --dir.")
 
 
